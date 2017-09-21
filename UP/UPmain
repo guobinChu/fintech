@@ -1,0 +1,254 @@
+from WindPy import w
+w.start();
+import time
+import numpy as np
+import pandas as pd
+from sklearn.linear_model import LinearRegression
+linreg = LinearRegression()
+start = time.clock() 
+
+netallzz500=1#净值初始化
+netzz500=[1]
+netallhs300=1#净值初始化
+neths300=[1]
+count=1
+#################提取中证800非金融指数成分股代码、权重#################
+indexdate=pd.read_csv('C:\\Users\\chuguobin\\Desktop\\UP2.0\\20071231-20170831update.csv').UPDATE#提取UP日期
+tradeDate=pd.read_csv('C:\\Users\\chuguobin\\Desktop\\UP2.0\\returndate.csv')
+for i in range(0,len(indexdate)):
+    #############变量初始化#############
+    indexdata=pd.DataFrame(columns=['code','weight','industry'])
+    dateandcode="date="+indexdate[i]+";windcode=000906.sh"#ZZ800
+    indexdata_temp=w.wset("indexconstituent",dateandcode).Data
+    indexdata.code=indexdata_temp[1]
+    indexdata.weight=indexdata_temp[3]
+    codetoindustry=indexdata.code.tolist()
+    indexdata.industry= w.wss(codetoindustry, "industry_gics","industryType=1").Data[0]
+    indexdata_nofin=indexdata[indexdata["industry"]!='金融']#剔除金融股
+    indexdata_nofin=indexdata_nofin.reset_index(drop=True)
+    code_df=indexdata_nofin.code
+    code_df.index=range(0,len(code_df))
+    code=np.hstack(np.array(code_df)).tolist()#转为list
+    size=len(code)
+    
+    
+    ############计算上年同期RNOA#######
+    lastyear=get_last_year(indexdate[i])#去年同期日期
+    NOAly=get_NOA(code,lastyear)
+    OIly=get_OI(code,lastyear)
+    RNOAly=list(map(div_nozero,OIly,NOAly))#计算去年同期RNOA得到的是list
+    RNOAly=pd.DataFrame(RNOAly,columns=['RNOA'])#dataframe
+    
+    ############计算上年同期变量#######
+    variables=pd.DataFrame(columns=['lnBTM','lnM','dNTN','RNOAly','dRONAly','dRONAlq','ATN','NODIVD','DIVDTN'])
+    variables_temp=get_variable(code,lastyear)#get_variable初始得到的是元组
+    variables_list=np.hstack(list(variables_temp)).tolist()#元组转为list
+    variables.lnBTM=variables_list[0:len(code)]
+    variables.lnM=variables_list[len(code):2*len(code)]
+    variables.dNTN=variables_list[2*len(code):3*len(code)]
+    variables.RNOAly=variables_list[3*len(code):4*len(code)]
+    variables.dRONAly=variables_list[4*len(code):5*len(code)]
+    variables.dRONAlq=variables_list[5*len(code):6*len(code)]
+    variables.ATN=variables_list[6*len(code):7*len(code)]
+    variables.NODIVD=variables_list[7*len(code):8*len(code)]
+    variables.DIVDTN=variables_list[8*len(code):9*len(code)]
+    
+    ############计算上年回归系数###########################
+    #剔除包含0的行
+    mark=pd.DataFrame(np.ones(len(RNOAly)),columns=['mark'])
+    yx=pd.concat([RNOAly,variables,mark],axis=1)#将应变量和自变量并起来
+    for ii in range(0,size):
+        if min(abs(np.array((yx[ii:ii+1]).iloc[:,0:8])).tolist()[0])==0:
+            yx.iat[ii,10]=0
+    yx_new=yx[yx['mark']==1]
+    yx_new=yx_new.reset_index(drop=True)
+    yx_new_size=len(yx_new)
+    #去极值
+    columns=np.array(yx.columns).tolist()
+    for iii in range(0,len(columns)):
+        q=(np.hstack(np.array(yx_new.iloc[:,iii:iii+1]))).tolist()
+        q1=np.percentile(q,25)#1/4分位数
+        q3=np.percentile(q,75)#3/4分位数
+        iqr=q3-q1
+        for j in range(0,yx_new_size):
+            if yx_new.iat[j,iii]> q3+3*iqr or yx_new.iat[j,iii]<q1-3*iqr:
+                yx_new.iat[j,10]=0
+    yx_new=yx_new[yx_new['mark']==1]
+    yx_new=yx_new.reset_index(drop=True)
+    y_new=yx_new.iloc[:,0:1]
+    x_new=yx_new.iloc[:,1:10]
+    linreg.fit(x_new,y_new)
+    coef_temp=linreg.coef_[0]#array格式 竖着的
+    coef=coef_temp.reshape(1,len(coef_temp))#array格式 横着的
+    
+    ############计算当期RNOA###########
+    NOA=get_NOA(code,indexdate[i])
+    OI=get_OI(code,indexdate[i])
+    RNOA_now_list=list(map(div_nozero,OI,NOA))#计算当期RNOA list
+    RNOA_now=pd.DataFrame(RNOA_now_list,columns=['RNOA'])#DATAFRAME
+    
+    ############计算当期变量#######
+    variables=pd.DataFrame(columns=['lnBTM','lnM','dNTN','RNOAly','dRONAly','dRONAlq','ATN','NODIVD','DIVDTN'])
+    variables_temp=get_variable(code,indexdate[i])
+    variables_list=np.hstack(list(variables_temp)).tolist()#元组转为list
+    variables.lnBTM=variables_list[0:len(code)]
+    variables.lnM=variables_list[len(code):2*len(code)]
+    variables.dNTN=variables_list[2*len(code):3*len(code)]
+    variables.RNOAly=variables_list[3*len(code):4*len(code)]
+    variables.dRONAly=variables_list[4*len(code):5*len(code)]
+    variables.dRONAlq=variables_list[5*len(code):6*len(code)]
+    variables.ATN=variables_list[6*len(code):7*len(code)]
+    variables.NODIVD=variables_list[7*len(code):8*len(code)]
+    variables.DIVDTN=variables_list[8*len(code):9*len(code)]
+    variables_ar=np.array(variables)#df转为ar格式
+    
+    ############计算UP###############
+    RNOA_pre=sum((coef*variables_ar).T)
+    UP=(np.array(RNOA_now_list)-RNOA_pre).tolist()#list
+    UP_df=pd.DataFrame(UP,columns=['UP'])
+    
+    ##########选股算净值预备#############
+    #########zz800数据###############
+    code_up=code_df
+    code_up.columns=['code']
+    weight_up=indexdata_nofin.weight
+    weight_up.columns=['weight']
+    UPdata_zz800=pd.concat([code_up,weight_up,UP_df],axis=1)
+    
+    ############hs30和zz500非金融股代码及权重、UP############
+    indexdata_hs300=pd.DataFrame(columns=['code','weight','industry'])
+    indexdata_zz500=pd.DataFrame(columns=['code','weight','industry'])
+
+    dateandcode_hs300="date="+indexdate[i]+";windcode=000300.sh"
+    dateandcode_zz500="date="+indexdate[i]+";windcode=000905.sh"
+    
+    indexdata_hs300temp=w.wset("indexconstituent",dateandcode_hs300).Data
+    indexdata_zz500temp=w.wset("indexconstituent",dateandcode_zz500).Data
+    
+    indexdata_hs300.code=indexdata_hs300temp[1]
+    indexdata_zz500.code=indexdata_zz500temp[1]
+    
+    indexdata_hs300.weight=indexdata_hs300temp[3]
+    indexdata_zz500.weight=indexdata_zz500temp[3]
+    
+    codetoindustry_hs300=indexdata_hs300.code.tolist()
+    codetoindustry_zz500=indexdata_zz500.code.tolist()
+    
+    indexdata_hs300.industry= w.wss(codetoindustry_hs300, "industry_gics","industryType=1").Data[0]
+    indexdata_zz500.industry= w.wss(codetoindustry_zz500, "industry_gics","industryType=1").Data[0]
+    
+    indexdata_hs300_nofin=indexdata_hs300[indexdata_hs300["industry"]!='金融']#剔除金融股'code','weight','industry'
+    indexdata_hs300_nofin=indexdata_hs300_nofin.reset_index(drop=True)
+    indexdata_zz500_nofin=indexdata_zz500[indexdata_zz500["industry"]!='金融']#剔除金融股
+    indexdata_zz500_nofin=indexdata_zz500_nofin.reset_index(drop=True)
+    
+    code_hs300_nofin=indexdata_hs300_nofin.code
+    code_zz500_nofin=indexdata_zz500_nofin.code
+    
+    code_hs300_nofin.index=range(0,len(code_hs300_nofin))
+    code_zz500_nofin.index=range(0,len(code_zz500_nofin))
+    
+    code_hs300_nofin_list=np.hstack(np.array(code_hs300_nofin)).tolist()#hs300非金融股代码
+    code_zz500_nofin_list=np.hstack(np.array(code_zz500_nofin)).tolist()
+    
+    UPdata_hs300=UPdata_zz800[UPdata_zz800['code'].isin(code_hs300_nofin_list)]#hs300数据code weight（zz800里的要改） UP
+    UPdata_zz500=UPdata_zz800[UPdata_zz800['code'].isin(code_zz500_nofin_list)]
+    
+    UPdata_hs300=UPdata_hs300.reset_index(drop=True)
+    UPdata_zz500=UPdata_zz500.reset_index(drop=True)
+    
+    UPdata_hs300.weight=indexdata_hs300_nofin.weight#将hs300的权重附上去
+    UPdata_zz500.weight=indexdata_zz500_nofin.weight
+    
+    ##########选股算净值#############
+    UPdata_zz800_sort=UPdata_zz800.sort_values(by='UP', ascending=False)#对数据按UP自大到小排序
+    UPdata_zz800_sort=UPdata_zz800_sort.reset_index(drop=True)
+    
+    
+    ##########hs300选股算净值#############
+    ##########选中code##############
+    UPdata_hs300_sort=UPdata_hs300.sort_values(by='UP', ascending=False)#对数据按UP自大到小排序
+    UPdata_hs300_sort=UPdata_hs300_sort.reset_index(drop=True)
+    weight1=0
+    for j in range(0,len(UPdata_hs300_sort)):
+        if weight1<=50:
+            weight1=weight1+UPdata_hs300_sort.weight[j]
+        else:
+            break
+    datahs300_ch=UPdata_hs300_sort.head(j)
+    codehs300_ch=np.array(datahs300_ch.code).tolist()
+    weightzz800=100-weight1
+    weight2=0
+    for j in range(0,len(UPdata_zz800_sort)):
+        if weight2<=weightzz800:
+            weight2=weight2+UPdata_zz800_sort.weight[j]
+        else:
+            break
+    datazz800_ch=UPdata_zz800_sort.head(j)  
+    codezz800_ch=np.array(datazz800_ch.code).tolist()
+    sumweight=weight1+weight2
+    
+    #############交易日############
+    tradeDate_now=np.array(tradeDate[tradeDate["quarter"]==count].date).tolist()
+    print(count)
+    count +=1
+    for tradeDatecheck in tradeDate_now:
+        datahs300_ch_return=(np.nan_to_num(w.wss(codehs300_ch, "pct_chg",tradeDatecheck).Data[0])).tolist()
+        for j in range(0,len(codehs300_ch)):
+            if datahs300_ch_return[j]==None:
+                datahs300_ch_return[j]=0
+        net_datahs300_ch=((netallhs300*(np.array(np.nan_to_num(datahs300_ch['weight'])))/sumweight)*(1+np.array(datahs300_ch_return)/100)).tolist()
+        
+        datazz800_ch_return=(np.nan_to_num(w.wss(codezz800_ch, "pct_chg",tradeDatecheck).Data[0])).tolist()
+        for j in range(0,len(codezz800_ch)):
+            if datazz800_ch_return[j]==None:
+                datazz800_ch_return[j]=0
+        net_datazz800_ch=((netallhs300*(np.array(np.nan_to_num(datazz800_ch['weight'])))/sumweight)*(1+np.array(datazz800_ch_return)/100)).tolist()
+        netallhs300=sum(net_datahs300_ch)+sum(net_datazz800_ch)
+        neths300.append(netallhs300)
+    
+    ##########zz500选股算净值#############
+    ##########选中code##############
+    UPdata_zz500_sort=UPdata_zz500.sort_values(by='UP', ascending=False)#对数据按UP自大到小排序
+    UPdata_zz500_sort=UPdata_zz500_sort.reset_index(drop=True)
+    weight1=0
+    for j in range(0,len(UPdata_zz500_sort)):
+        if weight1<=50:
+            weight1=weight1+UPdata_zz500_sort.weight[j]
+        else:
+            break
+    datazz500_ch=UPdata_zz500_sort.head(j)
+    codezz500_ch=np.array(datazz500_ch.code).tolist()
+    weightzz800=100-weight1
+    weight2=0
+    for j in range(0,len(UPdata_zz800_sort)):
+        if weight2<=weightzz800:
+            weight2=weight2+UPdata_zz800_sort.weight[j]  
+        else:
+            break
+    datazz800_ch=UPdata_zz800_sort.head(j)  
+    codezz800_ch=np.array(datazz800_ch.code).tolist()
+    sumweight=weight1+weight2
+    
+    #############交易日############
+    tradeDate_now=np.array(tradeDate[tradeDate["quarter"]==count].date).tolist()
+    print(count)
+    count +=1
+    for tradeDatecheck in tradeDate_now:
+        datazz500_ch_return=(np.nan_to_num(w.wss(codezz500_ch, "pct_chg",tradeDatecheck).Data[0])).tolist()
+        for j in range(0,len(codezz500_ch)):
+            if datazz500_ch_return[j]==None:
+                datazz500_ch_return[j]=0
+        net_datazz500_ch=((netallzz500*(np.array(np.nan_to_num(datazz500_ch['weight'])))/sumweight)*(1+np.array(datazz500_ch_return)/100)).tolist()
+        
+        datazz800_ch_return=(np.nan_to_num(w.wss(codezz800_ch, "pct_chg",tradeDatecheck).Data[0])).tolist()
+        for j in range(0,len(codezz800_ch)):
+            if datazz800_ch_return[j]==None:
+                datazz800_ch_return[j]=0
+        net_datazz800_ch=((netallhs300*(np.array(np.nan_to_num(datazz800_ch['weight'])))/sumweight)*(1+np.array(datazz800_ch_return)/100)).tolist()
+        netallzz500=sum(net_datazz500_ch)+sum(net_datazz800_ch)
+        netzz500.append(netallzz500)
+    
+    
+elapsed = (time.clock() - start)
+print("Time used:",elapsed)   
