@@ -1,0 +1,91 @@
+#rptDate为RNOAdate
+#返回的是元组，b=np.hstack(list(a)).tolist()转为list
+def get_variable(code,rptDate):
+    rptDatelq=get_last_quarter(rptDate)
+    from WindPy import w
+    w.start();
+    import numpy as np
+    size=len(code)
+    
+    #1、2计算上一季度报告期账面市值对数比和市值对数
+    rptDatelqsz='unit=1;tradeDate='+rptDatelq
+    SZ=(np.nan_to_num(w.wss(code, "mkt_cap_ard",rptDatelqsz).Data[0])).tolist()#市值
+    for j in range(0,size):
+        if SZ[j]==None:
+            SZ[j]=0
+    rptDatelqgdqyhj='unit=1;rptDate='+rptDatelq+';rptType=1;currencyType='
+    GDQYHJ=(np.nan_to_num(w.wss(code, "tot_equity",rptDatelqgdqyhj).Data[0])).tolist()#股东权益
+    for j in range(0,size):
+        if GDQYHJ[j]==None:
+            GDQYHJ[j]=0
+    lnM=np.array(list(map(log_nozero,SZ)))#计算市值对数
+    lnBTM=np.array(list(map(lndiv_nozero,GDQYHJ,SZ)))#计算账面市值比对数
+    
+    #3计算上一季度净经营资产的同比增长率
+    rptDatelqly=get_last_year(rptDatelq)
+    dNOA=np.hstack(np.array(get_NOA(code,rptDatelq))-np.array(get_NOA(code,rptDatelqly))).tolist()
+    NOAlq=np.hstack(np.array(get_NOA(code,rptDatelq))).tolist()
+    dNTN=np.array(list(map(div_nozero,dNOA,NOAlq)))
+    
+    #4去年同期的净经营资产收益率，季度值
+    rptDately=get_last_year(rptDate)
+    NOAly=get_NOA(code,rptDately)
+    OIly=get_OI(code,rptDately)
+    RNOAly=np.array(list(map(div_nozero,OIly,NOAly)))#计算去年同期RNOA
+    
+    #5去年同期的同比变化量，季度值
+    rptDatelyly=get_last_year(rptDately)
+    NOAlyly=get_NOA(code,rptDatelyly)
+    OIlyly=get_OI(code,rptDatelyly)
+    dRNOAly=np.array(np.hstack(np.array(list(map(div_nozero,OIly,NOAly)))-np.array(list(map(div_nozero,OIlyly,NOAlyly)))))
+    
+    #6上季度的同比变化量，季度值
+    rptDatelqlq=get_last_quarter(rptDatelq)
+    NOAlq=get_NOA(code,rptDatelq)
+    OIlq=get_OI(code,rptDatelq)
+    NOAlqlq=get_NOA(code,rptDatelqlq)
+    OIlqlq=get_OI(code,rptDatelqlq)
+    dRNOAlq=np.array(np.hstack(np.array(list(map(div_nozero,OIlq,NOAlq)))-np.array(list(map(div_nozero,OIlqlq,NOAlqlq)))))
+    
+    #7计算上一季度应计盈余偏差
+    rptDatelqyylr='unit=1;rptDate='+rptDatelq
+    YYLR=(np.nan_to_num(w.wss(code,"op_ttm2",rptDatelqyylr).Data[0])).tolist()#营业利润
+    for j in range(0,size):
+        if YYLR[j]==None:
+            YYLR[j]=0
+    JYHDXJJLL=(np.nan_to_num(w.wss(code, "operatecashflow_ttm2",rptDatelqyylr).Data[0])).tolist()#经营活动现金净流量
+    for j in range(0,size):
+        if JYHDXJJLL[j]==None:
+            JYHDXJJLL[j]=0
+    ACClq=np.hstack(np.array(YYLR)-np.array(JYHDXJJLL)).tolist()
+    ATN=np.array(list(map(div_nozero,ACClq,NOAlq)))
+    
+    #8是否分红
+    year,month,day = map(int,rptDatelq.split('/'))
+    if month==3:
+        nearestyear=year-1
+        month=12
+        day=31
+    else:
+        nearestyear=year
+        month=12
+        day=31
+    sffhdate='/'.join(map(str,[nearestyear,month,day]))
+    rptDatesffh='rptDate='+sffhdate
+    SFFH=(np.nan_to_num(w.wss(code, "div_ifdiv",rptDatesffh).Data[0])).tolist()#是否分红
+    for j in range(0,size):
+        if SFFH[j]=='是':
+            SFFH[j]=0
+        else:
+            SFFH[j]=1
+    NODIVD=np.array(SFFH)
+    
+    #9计算分红金额
+    fhjedate='unit=1;year='+str(nearestyear)
+    FHJE=(np.nan_to_num(w.wss(code, "div_aualaccmdiv",fhjedate).Data[0])).tolist()#分红金额
+    for j in range(0,size):
+        if FHJE[j]==None:
+            FHJE[j]=0
+    DIVDTN=np.array(list(map(div_nozero,FHJE,NOAlq)))
+    
+    return lnBTM,lnM,dNTN,RNOAly,dRNOAly,dRNOAlq,ATN,NODIVD,DIVDTN
