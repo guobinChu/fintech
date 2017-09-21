@@ -1,0 +1,42 @@
+# fintech
+code for finance
+import math
+def div_nozero(x,y):
+        if y==0:
+            return 0
+        else:
+            return x/y
+
+def lndiv_nozero(x,y):
+        if y==0 or x==0 or x*y<0:
+            return 0
+        else:
+            return math.log(x/y)
+
+def log_nozero(x):
+       if x==0:
+           return 0
+       else:
+           return math.log(x)
+
+def get_last_year(currtime):###########计算去年同期日期
+    year,month,day = map(int,currtime.split('/'))
+    year -= 1
+    return '/'.join(map(str,[year,month,day]))
+
+def get_last_quarter(currtime):###########计算上季度日期
+    year,month,day = map(int,currtime.split('/'))
+    if month==3:
+        year =year-1
+        month=9
+        day=30
+    elif month==6:
+        month=3
+        day=31
+    elif month==9:
+        month=6
+        day=30
+    elif month==12:
+        month=9
+        day=30
+    return '/'.join(map(str,[year,month,day]))      
