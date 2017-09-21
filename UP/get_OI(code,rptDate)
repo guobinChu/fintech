@@ -1,0 +1,24 @@
+#rptDate为RNOAdate
+def get_OI(code,rptDate):
+    from WindPy import w
+    w.start();
+    import numpy as np
+    size=len(code)
+    rptDate='unit=1;rptDate='+rptDate+';rptType=1;currencyType='
+    JLR=(np.nan_to_num(w.wss(code, "net_profit_is",rptDate).Data[0])).tolist()#净利润
+    for j in range(0,size):
+        if JLR[j]==None:
+            JLR[j]=0
+    FJCXSY=(np.nan_to_num(w.wss(code, "extraordinary",rptDate).Data[0])).tolist()#非经常性损益
+    for j in range(0,size):
+        if FJCXSY[j]==None:
+            FJCXSY[j]=0
+    CWFY=(np.nan_to_num(w.wss(code, "fin_exp_is",rptDate).Data[0])).tolist()#财务费用
+    for j in range(0,size):
+        if CWFY[j]==None:
+            CWFY[j]=0
+    LXJSR=(np.nan_to_num(w.wss(code, "net_int_inc",rptDate).Data[0])).tolist()#利息净收入
+    for j in range(0,size):
+        if LXJSR[j]==None:
+            LXJSR[j]=0
+    return list(map(lambda x: x[0]-x[1]+0.75*x[2]-0.75*x[3],zip(JLR,FJCXSY,CWFY,LXJSR)))
