@@ -1,0 +1,68 @@
+#rptDate为RNOAdate
+def get_NOA(code,rptDate):
+    from WindPy import w
+    w.start();
+    import numpy as np
+    size=len(code)
+    rptDate='unit=1;rptDate='+rptDate+';rptType=1;currencyType='
+    GDQYHJ=(np.nan_to_num(w.wss(code, "tot_equity",rptDate).Data[0])).tolist()#股东权益nan转为0取list
+    for j in range(0,size):
+        if GDQYHJ[j]==None:
+            GDQYHJ[j]=0
+    DQJK=(np.nan_to_num(w.wss(code, "st_borrow",rptDate).Data[0])).tolist()#短期借款
+    for j in range(0,size):
+        if DQJK[j]==None:
+            DQJK[j]=0
+    JYXJRFZ=(np.nan_to_num(w.wss(code, "tradable_fin_liab",rptDate).Data[0])).tolist()#交易性金融资产
+    for j in range(0,size):
+        if JYXJRFZ[j]==None:
+            JYXJRFZ[j]=0
+    YFPJ=(np.nan_to_num(w.wss(code, "notes_payable",rptDate).Data[0])).tolist()#应付票据
+    for j in range(0,size):
+        if YFPJ[j]==None:
+            YFPJ[j]=0
+    YNNDQFLDFZ=(np.nan_to_num(w.wss(code, "non_cur_liab_due_within_1y",rptDate).Data[0])).tolist()#一年内到期非流动负债
+    for j in range(0,size):
+        if YNNDQFLDFZ[j]==None:
+            YNNDQFLDFZ[j]=0
+    CQJK=(np.nan_to_num(w.wss(code, "lt_borrow",rptDate).Data[0])).tolist()#长期借款
+    for j in range(0,size):
+        if CQJK[j]==None:
+            CQJK[j]=0
+    YFZQ=(np.nan_to_num(w.wss(code, "bonds_payable",rptDate).Data[0])).tolist()#应付债券
+    for j in range(0,size):
+        if YFZQ[j]==None:
+            YFZQ[j]=0
+    HBZJ=(np.nan_to_num(w.wss(code, "monetary_cap",rptDate).Data[0])).tolist()#货币资金
+    for j in range(0,size):
+        if HBZJ[j]==None:
+            HBZJ[j]=0
+    JYXJRZC=(np.nan_to_num(w.wss(code, "tradable_fin_assets",rptDate).Data[0])).tolist()#交易性金融资产
+    for j in range(0,size):
+        if JYXJRZC[j]==None:
+            JYXJRZC[j]=0
+    KGCSJRZC=(np.nan_to_num(w.wss(code, "fin_assets_avail_for_sale",rptDate).Data[0])).tolist()#可供出售金融资产
+    for j in range(0,size):
+        if  KGCSJRZC[j]==None:
+            KGCSJRZC[j]=0
+    CYZDQTZ=(np.nan_to_num(w.wss(code, "held_to_mty_invest",rptDate).Data[0])).tolist()#持有至到期资产
+    for j in range(0,size):
+        if  CYZDQTZ[j]==None:
+            CYZDQTZ[j]=0
+    TZXFDC=(np.nan_to_num(w.wss(code, "invest_real_estate",rptDate).Data[0])).tolist()#投资性房地产
+    for j in range(0,size):
+        if  TZXFDC[j]==None:
+            TZXFDC[j]=0
+    DQCK=(np.nan_to_num(w.wss(code, "time_deposits",rptDate).Data[0])).tolist()#定期存款
+    for j in range(0,size):
+        if DQCK[j]==None:
+            DQCK[j]=0
+    QTZC=(np.nan_to_num(w.wss(code, "oth_assets",rptDate).Data[0])).tolist()#其他资产
+    for j in range(0,size):
+        if QTZC[j]==None:
+            QTZC[j]=0
+    CQYSK=(np.nan_to_num(w.wss(code, "long_term_rec",rptDate).Data[0])).tolist()#长期应收款
+    for j in range(0,size):
+        if CQYSK[j]==None:
+            CQYSK[j]=0
+    return list(map(lambda x: x[0]+x[1]+x[2]+x[3]+x[4]+x[5]+x[6]-(x[7]+x[8]+x[9]+x[10]+x[11]+x[12]+x[13]+x[14]),zip(GDQYHJ,DQJK,JYXJRFZ,YFPJ,YNNDQFLDFZ,CQJK,YFZQ,HBZJ,JYXJRZC,KGCSJRZC,CYZDQTZ,TZXFDC,DQCK,QTZC,CQYSK)))
